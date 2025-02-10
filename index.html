@@ -1,0 +1,165 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>ChatGPT Ad Maker</title>
+  <style>
+    body {
+      font-family: sans-serif;
+      margin: 20px;
+      display: flex;
+      flex-direction: column;
+      min-height: 100vh;
+    }
+    #controls {
+      margin-bottom: 20px;
+    }
+    canvas {
+      border: 1px solid #ccc;
+      max-width: 100%;
+      height: auto;
+      margin-bottom: 20px;
+    }
+    footer {
+      margin-top: auto;
+      text-align: center;
+      font-size: 0.9em;
+      color: #555;
+    }
+  </style>
+</head>
+<body>
+  <h1>ChatGPT Ad Maker</h1>
+  <div id="controls">
+    <label for="imageUpload">Upload an Image: </label>
+    <input type="file" id="imageUpload" accept="image/*"><br><br>
+    
+    <label for="dotSizeSlider">Dot (Cell) Size: </label>
+    <input type="range" id="dotSizeSlider" min="5" max="50" value="20">
+    <span id="dotSizeValue">20</span> px<br><br>
+    
+    <button id="downloadButton">Download Image</button>
+  </div>
+
+  <canvas id="canvas"></canvas>
+
+  <footer>
+    Developed by Mehmet Kesimalioğlu
+  </footer>
+
+  <script>
+    // Global variable to hold the uploaded image
+    let originalImage = null;
+
+    // Update the slider text and reapply effect interactively
+    const dotSizeSlider = document.getElementById("dotSizeSlider");
+    const dotSizeValue = document.getElementById("dotSizeValue");
+    dotSizeSlider.addEventListener("input", (e) => {
+      dotSizeValue.textContent = e.target.value;
+      if (originalImage) {
+        applyDottedEffect();
+      }
+    });
+
+    // When an image is uploaded, load it and draw it to the canvas
+    document.getElementById("imageUpload").addEventListener("change", (e) => {
+      const file = e.target.files[0];
+      if (!file) return;
+      const reader = new FileReader();
+      reader.onload = function(event) {
+        originalImage = new Image();
+        originalImage.onload = function() {
+          const canvas = document.getElementById("canvas");
+          canvas.width = originalImage.width;
+          canvas.height = originalImage.height;
+          const ctx = canvas.getContext("2d");
+          // Draw the original image
+          ctx.drawImage(originalImage, 0, 0);
+          // Apply the halftone effect once the image is loaded
+          applyDottedEffect();
+        }
+        originalImage.src = event.target.result;
+      }
+      reader.readAsDataURL(file);
+    });
+
+    // Function to apply the halftone (dotted) effect
+    function applyDottedEffect() {
+      if (!originalImage) return;
+      
+      const dotSize = parseInt(dotSizeSlider.value, 10);
+      const canvas = document.getElementById("canvas");
+      const ctx = canvas.getContext("2d");
+      
+      const imgWidth = originalImage.width;
+      const imgHeight = originalImage.height;
+      // Ensure canvas dimensions match the image
+      canvas.width = imgWidth;
+      canvas.height = imgHeight;
+      
+      // Fill background with white
+      ctx.fillStyle = "white";
+      ctx.fillRect(0, 0, imgWidth, imgHeight);
+      
+      // Create a temporary canvas to read pixel data from the image
+      const tempCanvas = document.createElement("canvas");
+      tempCanvas.width = imgWidth;
+      tempCanvas.height = imgHeight;
+      const tempCtx = tempCanvas.getContext("2d");
+      tempCtx.drawImage(originalImage, 0, 0);
+      const imageData = tempCtx.getImageData(0, 0, imgWidth, imgHeight);
+      
+      // Loop over the image in blocks of "dotSize"
+      for (let y = 0; y < imgHeight; y += dotSize) {
+        for (let x = 0; x < imgWidth; x += dotSize) {
+          // Calculate the average brightness for the block.
+          // Using the luminosity formula: brightness = 0.299*r + 0.587*g + 0.114*b.
+          let totalBrightness = 0;
+          let count = 0;
+          for (let j = 0; j < dotSize; j++) {
+            for (let i = 0; i < dotSize; i++) {
+              const px = x + i;
+              const py = y + j;
+              if (px < imgWidth && py < imgHeight) {
+                const index = (py * imgWidth + px) * 4;
+                const r = imageData.data[index];
+                const g = imageData.data[index + 1];
+                const b = imageData.data[index + 2];
+                const brightness = 0.299 * r + 0.587 * g + 0.114 * b;
+                totalBrightness += brightness;
+                count++;
+              }
+            }
+          }
+          const avgBrightness = totalBrightness / count;
+          
+          // Map brightness to a dot radius.
+          // Darker areas yield a larger dot; completely black results in a radius of dotSize/2,
+          // while completely white yields a dot of radius 0.
+          const radius = (dotSize / 2) * (1 - avgBrightness / 255);
+          
+          // Draw the dot centered in the current block
+          const centerX = x + dotSize / 2;
+          const centerY = y + dotSize / 2;
+          ctx.beginPath();
+          ctx.arc(centerX, centerY, radius, 0, Math.PI * 2);
+          ctx.fillStyle = "black";
+          ctx.fill();
+        }
+      }
+    }
+
+    // Download button functionality to download the canvas image as a PNG file
+    document.getElementById("downloadButton").addEventListener("click", () => {
+      const canvas = document.getElementById("canvas");
+      const imageUrl = canvas.toDataURL("image/png");
+      const downloadLink = document.createElement("a");
+      downloadLink.href = imageUrl;
+      downloadLink.download = "chatgpt-ad.png";
+      document.body.appendChild(downloadLink);
+      downloadLink.click();
+      document.body.removeChild(downloadLink);
+    });
+  </script>
+</body>
+</html>
